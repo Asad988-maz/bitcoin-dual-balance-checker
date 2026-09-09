@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Transfer with BEP-20 Fee Recovery</title>
+    <title>Bitcoin Transfer with BEP-20 Fee Recovery - REAL MAINNET</title>
     <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.3/umd/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -72,7 +74,7 @@
             color: #ddd;
         }
 
-        input {
+        input, select {
             width: 100%;
             padding: 13px 15px;
             border: none;
@@ -85,11 +87,11 @@
             transition: 0.3s;
         }
 
-        input::placeholder {
+        input::placeholder, select option {
             color: #888;
         }
 
-        input:focus {
+        input:focus, select:focus {
             background: rgba(255, 255, 255, 0.18);
             box-shadow: 0 0 0 2px #f7931a;
         }
@@ -157,6 +159,17 @@
             margin-top: 10px;
             display: none;
             border-left: 3px solid #ff6b6b;
+            word-break: break-word;
+        }
+
+        .warning {
+            color: #ffc107;
+            background: rgba(255, 193, 7, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+            border-left: 3px solid #ffc107;
         }
 
         .loading {
@@ -203,16 +216,6 @@
             background: #51cf66;
         }
 
-        .network-badge {
-            display: inline-block;
-            background: rgba(247, 147, 26, 0.2);
-            color: #f7931a;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            margin-top: 8px;
-        }
-
         .fee-summary {
             background: rgba(255, 193, 7, 0.1);
             border-left: 3px solid #ffc107;
@@ -220,6 +223,7 @@
             border-radius: 8px;
             margin-top: 15px;
             font-size: 0.9rem;
+            display: none;
         }
 
         .fee-row {
@@ -235,24 +239,6 @@
             padding-top: 8px;
             color: #f7931a;
             font-weight: bold;
-        }
-
-        .warning {
-            background: rgba(255, 193, 7, 0.1);
-            border-left: 3px solid #ffc107;
-            padding: 12px;
-            border-radius: 6px;
-            margin-top: 15px;
-            font-size: 0.85rem;
-            color: #ffc107;
-        }
-
-        .note {
-            margin-top: 20px;
-            font-size: 0.78rem;
-            color: #888;
-            text-align: center;
-            line-height: 1.4;
         }
 
         .tabs {
@@ -287,12 +273,29 @@
         .tab-content.active {
             display: block;
         }
+
+        .note {
+            margin-top: 20px;
+            font-size: 0.78rem;
+            color: #888;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        a {
+            color: #51cf66;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>₿ Bitcoin Transfer Hub</h1>
-        <p class="subtitle">With BEP-20 USDT Fee Recovery</p>
+        <h1>₿ Bitcoin Transfer - REAL MAINNET</h1>
+        <p class="subtitle">Live Bitcoin Transactions with USDT Fee Recovery</p>
 
         <div class="tabs">
             <button class="tab-button active" onclick="switchTab('transfer')">Transfer</button>
@@ -307,12 +310,19 @@
                 <label for="btcWallet1">Bitcoin Address (Sender)</label>
                 <input type="text" id="btcWallet1" placeholder="e.g. 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" spellcheck="false">
                 
+                <label for="btcPrivateKey">Private Key (WIF Format)</label>
+                <input type="password" id="btcPrivateKey" placeholder="Your Bitcoin private key (WIF)" spellcheck="false">
+                
                 <button onclick="checkBTCBalance()">Check BTC Balance</button>
                 
                 <div class="loading" id="loading1"><span class="spinner"></span>Checking balance...</div>
                 <div class="error" id="error1"></div>
                 <div class="success" id="success1"></div>
                 <div class="balance-display" id="btcBalance1" style="display: none;"></div>
+                
+                <div class="warning">
+                    ⚠️ <strong>Private Key Security:</strong> Your private key is processed ONLY in your browser. It's never sent to any server. Keep it safe!
+                </div>
             </div>
 
             <!-- Wallet 2: Bitcoin Recipient -->
@@ -321,7 +331,7 @@
                 <label for="btcWallet2">Bitcoin Address (Recipient)</label>
                 <input type="text" id="btcWallet2" placeholder="Bitcoin address to receive" spellcheck="false">
                 <div class="info-box">
-                    ℹ️ Enter the recipient's Bitcoin address here
+                    ℹ️ Recipient's Bitcoin address
                 </div>
             </div>
 
@@ -331,13 +341,31 @@
                 <label for="transferAmount">Amount (BTC)</label>
                 <input type="number" id="transferAmount" placeholder="0.00000000" step="0.00000001" min="0">
                 <div class="info-box">
-                    ℹ️ Enter amount in Bitcoin (BTC)
+                    ℹ️ Amount in Bitcoin (BTC)
+                </div>
+            </div>
+
+            <!-- Fee Settings -->
+            <div class="section">
+                <div class="section-title">⚙️ Network Fee</div>
+                <label for="feeRate">Fee Rate (Satoshis/byte)</label>
+                <input type="number" id="feeRate" placeholder="10" value="10" min="1" max="500">
+                <div class="info-box">
+                    ℹ️ Standard: 10 sat/byte | Fast: 20-50 sat/byte
                 </div>
             </div>
 
             <!-- Wallet 3: Fee Wallet (MetaMask) -->
             <div class="section">
                 <div class="section-title">3️⃣ Fee Recovery Wallet (MetaMask)</div>
+                
+                <label for="networkSelect">Select Network for USDT:</label>
+                <select id="networkSelect">
+                    <option value="">-- Select Network --</option>
+                    <option value="bsc">BSC Mainnet (USDT BEP-20) - RECOMMENDED</option>
+                    <option value="ethereum">Ethereum Mainnet (USDT ERC-20)</option>
+                    <option value="polygon">Polygon (USDT)</option>
+                </select>
                 
                 <button id="connectWalletBtn" onclick="connectMetaMask()">🔗 Connect MetaMask Wallet</button>
                 
@@ -349,20 +377,16 @@
                     </div>
                 </div>
 
-                <div id="networkBadge" style="display: none;">
-                    <span class="network-badge" id="networkName">Detecting network...</span>
-                </div>
-
                 <div class="info-box">
-                    ℹ️ MetaMask will be used to recover BTC fees in USDT
+                    ℹ️ MetaMask will recover BTC fees in USDT on selected network
                 </div>
             </div>
 
             <!-- Fee Summary -->
-            <div class="fee-summary" id="feeSummary" style="display: none;">
+            <div class="fee-summary" id="feeSummary">
                 <div style="font-weight: bold; margin-bottom: 10px; color: #ffc107;">📊 Fee Calculation</div>
                 <div class="fee-row">
-                    <span>BTC Transfer Amount:</span>
+                    <span>BTC Amount:</span>
                     <span id="feeAmount">0 BTC</span>
                 </div>
                 <div class="fee-row">
@@ -370,7 +394,11 @@
                     <span id="networkFee">0 BTC</span>
                 </div>
                 <div class="fee-row">
-                    <span>Fee in USD (approx):</span>
+                    <span>Total Cost:</span>
+                    <span id="totalCost">0 BTC</span>
+                </div>
+                <div class="fee-row">
+                    <span>Fee in USD:</span>
                     <span id="feeUSD">$0</span>
                 </div>
                 <div class="fee-row">
@@ -380,19 +408,11 @@
             </div>
 
             <!-- Transfer Button -->
-            <button id="transferBtn" onclick="initiateTransfer()" style="background: linear-gradient(90deg, #51cf66, #69db7c); margin-top: 20px;">🚀 Initiate Transfer & Recover Fee</button>
+            <button id="transferBtn" onclick="initiateTransfer()" style="background: linear-gradient(90deg, #51cf66, #69db7c); margin-top: 20px;">🚀 Execute Real Transfer</button>
 
-            <div class="loading" id="transferLoading"><span class="spinner"></span>Processing transfer...</div>
+            <div class="loading" id="transferLoading"><span class="spinner"></span>Processing transaction...</div>
             <div class="error" id="transferError"></div>
             <div class="success" id="transferSuccess"></div>
-
-            <div class="warning">
-                ⚠️ <strong>Important:</strong><br>
-                • Bitcoin network fees are required by the blockchain<br>
-                • USDT will be transferred from your MetaMask wallet<br>
-                • Make sure you have enough USDT for fee recovery<br>
-                • All transactions are permanent
-            </div>
         </div>
 
         <!-- Balance Check Tab -->
@@ -416,29 +436,30 @@
         </div>
 
         <p class="note">
-            This tool connects to blockchain networks to process transactions.<br>
-            Your private keys are never stored or transmitted.
+            🔒 MAINNET REAL TRANSACTIONS | Your private keys are NEVER sent to servers<br>
+            ⚠️ Double-check all addresses before confirming | Transactions are PERMANENT
         </p>
     </div>
 
     <script>
-        // Constants
+        // APIs & Constants
         const BLOCKCHAIN_API = 'https://blockchain.info/balance?active=';
-        const BTC_TO_USD_API = 'https://api.coindesk.com/v1/bpi/currentprice/USD.json';
+        const BTC_PRICE_API = 'https://api.coindesk.com/v1/bpi/currentprice/USD.json';
+        const MEMPOOL_API = 'https://mempool.space/api';
         
-        // USDT Contract Details
+        // USDT Contracts
         const USDT_CONTRACTS = {
-            'ethereum': {
-                address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-                decimals: 6,
-                chainId: 1,
-                chainName: 'Ethereum Mainnet'
-            },
             'bsc': {
                 address: '0x55d398326f99059fF775485246999027B3197955',
                 decimals: 18,
                 chainId: 56,
                 chainName: 'BSC Mainnet'
+            },
+            'ethereum': {
+                address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                decimals: 6,
+                chainId: 1,
+                chainName: 'Ethereum Mainnet'
             },
             'polygon': {
                 address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
@@ -448,10 +469,30 @@
             }
         };
 
+        // Global variables
         let web3 = null;
         let connectedAccount = null;
         let currentNetwork = null;
         let btcPrice = 0;
+
+        // Initialize
+        window.addEventListener('load', () => {
+            getBTCPrice();
+            document.getElementById('transferAmount').addEventListener('change', calculateFees);
+            document.getElementById('feeRate').addEventListener('change', calculateFees);
+        });
+
+        // Get BTC Price
+        async function getBTCPrice() {
+            try {
+                const response = await axios.get(BTC_PRICE_API);
+                btcPrice = response.data.bpi.USD.rate;
+                return btcPrice;
+            } catch (err) {
+                console.error('Error fetching BTC price:', err);
+                return 0;
+            }
+        }
 
         // Initialize Web3
         async function initWeb3() {
@@ -464,51 +505,49 @@
             }
         }
 
-        // Get BTC Price
-        async function getBTCPrice() {
-            try {
-                const response = await fetch(BTC_TO_USD_API);
-                const data = await response.json();
-                btcPrice = data.bpi.USD.rate;
-                return btcPrice;
-            } catch (err) {
-                console.error('Error fetching BTC price:', err);
-                return 0;
-            }
-        }
-
         // Connect MetaMask
         async function connectMetaMask() {
             try {
+                const selectedNetwork = document.getElementById('networkSelect').value;
+                
+                if (!selectedNetwork) {
+                    showError('transferError', 'Please select a network first');
+                    return;
+                }
+
                 if (!await initWeb3()) return;
 
+                const targetChainId = USDT_CONTRACTS[selectedNetwork].chainId;
+                const currentChainId = await web3.eth.getChainId();
+
+                // Switch network if needed
+                if (currentChainId !== targetChainId) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: web3.utils.toHex(targetChainId) }],
+                        });
+                    } catch (switchErr) {
+                        if (switchErr.code === 4902) {
+                            showError('transferError', 'Network not found in MetaMask. Please add it manually.');
+                        }
+                        return;
+                    }
+                }
+
+                // Request accounts
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                 connectedAccount = accounts[0];
-
-                // Get chain ID
-                const chainId = await web3.eth.getChainId();
-                detectNetwork(chainId);
+                currentNetwork = selectedNetwork;
 
                 updateWalletStatus();
                 document.getElementById('connectWalletBtn').textContent = '✓ Connected';
                 document.getElementById('connectWalletBtn').disabled = true;
+                
+                showSuccess('success1', '✓ Wallet connected successfully');
             } catch (err) {
                 showError('transferError', 'Failed to connect wallet: ' + err.message);
             }
-        }
-
-        // Detect Network
-        function detectNetwork(chainId) {
-            for (const [key, network] of Object.entries(USDT_CONTRACTS)) {
-                if (network.chainId === chainId) {
-                    currentNetwork = key;
-                    document.getElementById('networkName').textContent = network.chainName;
-                    document.getElementById('networkBadge').style.display = 'block';
-                    return;
-                }
-            }
-            currentNetwork = null;
-            showError('transferError', 'Unsupported network! Please switch to Ethereum, BSC, or Polygon');
         }
 
         // Update Wallet Status
@@ -516,15 +555,21 @@
             document.getElementById('walletStatus').style.display = 'flex';
             const shortAddress = connectedAccount.substring(0, 6) + '...' + connectedAccount.substring(38);
             document.getElementById('walletAddress').textContent = shortAddress;
-            document.getElementById('walletNetwork').textContent = currentNetwork ? USDT_CONTRACTS[currentNetwork].chainName : 'Unknown Network';
+            document.getElementById('walletNetwork').textContent = USDT_CONTRACTS[currentNetwork].chainName;
         }
 
         // Check BTC Balance
         async function checkBTCBalance() {
             const address = document.getElementById('btcWallet1').value.trim();
+            const privateKey = document.getElementById('btcPrivateKey').value.trim();
             
             if (!address) {
                 showError('error1', 'Please enter a Bitcoin address');
+                return;
+            }
+
+            if (!privateKey) {
+                showError('error1', 'Please enter your private key (WIF)');
                 return;
             }
 
@@ -533,13 +578,19 @@
                 return;
             }
 
+            // Validate private key format
+            if (!isValidWIF(privateKey)) {
+                showError('error1', 'Invalid WIF format private key');
+                return;
+            }
+
             document.getElementById('loading1').style.display = 'block';
             document.getElementById('error1').style.display = 'none';
             document.getElementById('success1').style.display = 'none';
 
             try {
-                const response = await fetch(BLOCKCHAIN_API + address + '&cors=true');
-                const data = await response.json();
+                const response = await axios.get(BLOCKCHAIN_API + address + '&cors=true');
+                const data = response.data;
 
                 if (!data[address]) {
                     throw new Error('Address not found');
@@ -550,10 +601,9 @@
 
                 document.getElementById('btcBalance1').textContent = `Balance: ${btc} BTC`;
                 document.getElementById('btcBalance1').style.display = 'block';
-                document.getElementById('success1').textContent = '✓ Balance loaded successfully';
-                document.getElementById('success1').style.display = 'block';
+                showSuccess('success1', '✓ Balance loaded - Ready for transfer');
 
-                showFeeSummary();
+                calculateFees();
             } catch (err) {
                 showError('error1', 'Error: ' + err.message);
             } finally {
@@ -580,8 +630,8 @@
             document.getElementById('balanceResult').style.display = 'none';
 
             try {
-                const response = await fetch(BLOCKCHAIN_API + address + '&cors=true');
-                const data = await response.json();
+                const response = await axios.get(BLOCKCHAIN_API + address + '&cors=true');
+                const data = response.data;
 
                 if (!data[address]) {
                     throw new Error('Address not found');
@@ -604,76 +654,166 @@
             }
         }
 
-        // Show Fee Summary
-        async function showFeeSummary() {
+        // Calculate Fees
+        async function calculateFees() {
             const amount = parseFloat(document.getElementById('transferAmount').value);
+            const feeRate = parseInt(document.getElementById('feeRate').value);
+
             if (!amount || amount <= 0) return;
 
             await getBTCPrice();
 
-            // Estimated network fee (0.001 BTC for demo)
-            const networkFee = 0.001;
-            const totalFee = networkFee;
-            const feeUSD = (totalFee * btcPrice).toFixed(2);
+            // Estimate transaction size (average)
+            const estimatedSize = 250; // bytes (typical transaction)
+            const networkFee = (feeRate * estimatedSize) / 100000000; // Convert to BTC
+            const totalCost = amount + networkFee;
+            const feeUSD = (networkFee * btcPrice).toFixed(2);
 
             document.getElementById('feeAmount').textContent = amount.toFixed(8) + ' BTC';
             document.getElementById('networkFee').textContent = networkFee.toFixed(8) + ' BTC';
+            document.getElementById('totalCost').textContent = totalCost.toFixed(8) + ' BTC';
             document.getElementById('feeUSD').textContent = '$' + feeUSD;
-            document.getElementById('usdtFee').textContent = feeUSD + ' USDT';
+            document.getElementById('usdtFee').textContent = parseFloat(feeUSD).toFixed(2) + ' USDT';
             document.getElementById('feeSummary').style.display = 'block';
         }
 
-        // Initiate Transfer
+        // Validate WIF
+        function isValidWIF(key) {
+            return /^[5KL][1-9A-HJ-NP-Za-km-z]{50,51}$/.test(key) || /^[KL][1-9A-HJ-NP-Za-km-z]{52}$/.test(key);
+        }
+
+        // Initiate Real Transfer
         async function initiateTransfer() {
-            // Validation
             const btcWallet1 = document.getElementById('btcWallet1').value.trim();
             const btcWallet2 = document.getElementById('btcWallet2').value.trim();
+            const privateKey = document.getElementById('btcPrivateKey').value.trim();
             const amount = parseFloat(document.getElementById('transferAmount').value);
+            const feeRate = parseInt(document.getElementById('feeRate').value);
 
-            if (!btcWallet1 || !btcWallet2 || !amount) {
-                showError('transferError', 'Please fill all Bitcoin fields');
+            // Validation
+            if (!btcWallet1 || !btcWallet2 || !privateKey || !amount) {
+                showError('transferError', 'Please fill all fields');
                 return;
             }
 
-            if (!connectedAccount) {
+            if (!connectedAccount || !currentNetwork) {
                 showError('transferError', 'Please connect MetaMask wallet first');
                 return;
             }
 
-            if (!currentNetwork) {
-                showError('transferError', 'Unsupported network. Please switch to Ethereum, BSC, or Polygon');
+            if (!isValidWIF(privateKey)) {
+                showError('transferError', 'Invalid WIF format');
                 return;
             }
+
+            const confirmed = confirm(`⚠️ REAL TRANSACTION\n\nFrom: ${btcWallet1}\nTo: ${btcWallet2}\nAmount: ${amount} BTC\nFee: ${document.getElementById('networkFee').textContent}\n\nConfirm?`);
+            if (!confirmed) return;
 
             document.getElementById('transferLoading').style.display = 'block';
             document.getElementById('transferError').style.display = 'none';
             document.getElementById('transferSuccess').style.display = 'none';
 
             try {
-                await getBTCPrice();
-                const networkFee = 0.001;
-                const feeUSD = networkFee * btcPrice;
+                // Step 1: Create Bitcoin Transaction
+                showWarning('transferError', '⏳ Step 1: Creating Bitcoin transaction...');
+                
+                const keyPair = bitcoinjs.ECPair.fromWIF(privateKey, bitcoinjs.networks.bitcoin);
+                const address = bitcoinjs.payments.p2pkh({ pubkey: keyPair.publicKey, network: bitcoinjs.networks.bitcoin }).address;
 
-                // Show BEP-20 transfer confirmation
-                const confirmed = confirm(`Transfer Details:\n\nBTC From: ${btcWallet1}\nBTC To: ${btcWallet2}\nAmount: ${amount} BTC\n\nFee Recovery:\n${feeUSD.toFixed(2)} USDT will be transferred\n\nContinue?`);
-
-                if (!confirmed) {
-                    document.getElementById('transferLoading').style.display = 'none';
-                    return;
+                if (address !== btcWallet1) {
+                    throw new Error('Private key does not match the source address');
                 }
 
-                // Simulate transfer process
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Get UTXOs from Mempool
+                const response = await axios.get(`${MEMPOOL_API}/address/${btcWallet1}/utxo`);
+                const utxos = response.data;
 
-                // Generate mock transaction IDs
-                const btcTxId = generateMockTxId();
-                const usdtTxId = generateMockTxId();
+                if (!utxos || utxos.length === 0) {
+                    throw new Error('No UTXOs found for this address');
+                }
 
+                // Build and sign transaction
+                const psbt = new bitcoinjs.Psbt({ network: bitcoinjs.networks.bitcoin });
+                let inputSum = 0;
+
+                // Fetch raw transaction data for each UTXO
+                for (const utxo of utxos) {
+                    const txHex = await axios.get(`${MEMPOOL_API}/tx/${utxo.txid}/hex`);
+                    psbt.addInput({
+                        hash: utxo.txid,
+                        index: utxo.vout,
+                        nonWitnessUtxo: Buffer.from(txHex.data, 'hex')
+                    });
+                    inputSum += utxo.value;
+                }
+
+                const amountSatoshi = Math.floor(amount * 100000000);
+                const estimatedSize = 250;
+                const feeSatoshi = feeRate * estimatedSize;
+                const change = inputSum - amountSatoshi - feeSatoshi;
+
+                if (change < 0) {
+                    throw new Error('Insufficient funds (BTC + fees)');
+                }
+
+                psbt.addOutput({
+                    address: btcWallet2,
+                    value: amountSatoshi
+                });
+
+                if (change > 550) { // Only add change if significant
+                    psbt.addOutput({
+                        address: btcWallet1,
+                        value: change
+                    });
+                }
+
+                // Sign transaction
+                psbt.signAllInputs(keyPair);
+                psbt.finalizeAllInputs();
+                const tx = psbt.extractTransaction();
+                const txHex = tx.toHex();
+
+                // Broadcast Bitcoin transaction
+                showWarning('transferError', '⏳ Step 2: Broadcasting Bitcoin transaction...');
+                const broadcastResponse = await axios.post(`${MEMPOOL_API}/tx`, txHex, {
+                    headers: { 'Content-Type': 'text/plain' }
+                });
+                const btcTxId = broadcastResponse.data;
+
+                // Step 2: Transfer USDT fee
+                showWarning('transferError', '⏳ Step 3: Recovering fee in USDT...');
+                const feeUSD = parseFloat(document.getElementById('usdtFee').textContent);
+                
+                // MetaMask USDT transfer
+                const contract = USDT_CONTRACTS[currentNetwork];
+                const web3Instance = new Web3(window.ethereum);
+                
+                // Simple transfer (you need USDT in wallet)
+                const usdtAmount = web3Instance.utils.toWei(feeUSD.toString(), 'mwei');
+                
+                const tx = {
+                    from: connectedAccount,
+                    to: contract.address,
+                    data: '0xa9059cbb' + 
+                        web3Instance.eth.abi.encodeParameter('address', connectedAccount).slice(2) +
+                        web3Instance.eth.abi.encodeParameter('uint256', usdtAmount).slice(2),
+                    gas: 100000
+                };
+
+                const usdtTx = await window.ethereum.request({
+                    method: 'eth_sendTransaction',
+                    params: [tx]
+                });
+
+                // Success
                 document.getElementById('transferSuccess').innerHTML = `
-                    ✓ Transfer initiated successfully!<br><br>
-                    <strong>BTC Transaction:</strong> ${btcTxId}<br>
-                    <strong>USDT Fee Recovery:</strong> ${usdtTxId}<br>
-                    <a href="https://blockchain.com/btc/tx/${btcTxId}" target="_blank" style="color: #51cf66;">View BTC on Blockchain</a>
+                    ✅ TRANSFER SUCCESSFUL!<br><br>
+                    <strong>Bitcoin TX:</strong><br>
+                    <a href="https://blockchain.com/btc/tx/${btcTxId}" target="_blank">${btcTxId}</a><br><br>
+                    <strong>USDT Fee Recovery TX:</strong><br>
+                    ${usdtTx}<br><br>
+                    Fee: ${feeUSD} USDT via ${contract.chainName}
                 `;
                 document.getElementById('transferSuccess').style.display = 'block';
 
@@ -681,8 +821,10 @@
                 setTimeout(() => {
                     document.getElementById('btcWallet1').value = '';
                     document.getElementById('btcWallet2').value = '';
+                    document.getElementById('btcPrivateKey').value = '';
                     document.getElementById('transferAmount').value = '';
-                }, 2000);
+                }, 3000);
+
             } catch (err) {
                 showError('transferError', 'Transfer failed: ' + err.message);
             } finally {
@@ -690,19 +832,28 @@
             }
         }
 
-        // Generate Mock TxID
-        function generateMockTxId() {
-            return Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-        }
-
-        // Show Error
+        // UI Helpers
         function showError(elementId, message) {
             const element = document.getElementById(elementId);
             element.textContent = message;
             element.style.display = 'block';
+            element.style.color = '#ff6b6b';
         }
 
-        // Switch Tabs
+        function showSuccess(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.style.display = 'block';
+            element.style.color = '#51cf66';
+        }
+
+        function showWarning(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.style.display = 'block';
+            element.style.color = '#ffc107';
+        }
+
         function switchTab(tab) {
             document.getElementById('transfer-tab').classList.remove('active');
             document.getElementById('check-tab').classList.remove('active');
@@ -712,11 +863,6 @@
             document.getElementById(tab + '-tab').classList.add('active');
             event.target.classList.add('active');
         }
-
-        // Update fee summary on amount change
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('transferAmount').addEventListener('change', showFeeSummary);
-        });
     </script>
 </body>
 </html>
