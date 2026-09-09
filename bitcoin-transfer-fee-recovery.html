@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Transfer with BEP-20 Fee Recovery</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 40px 30px;
+            width: 100%;
+            max-width: 700px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 8px;
+            font-size: 1.7rem;
+            color: #f7931a;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section:last-of-type {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            color: #f7931a;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: #ddd;
+        }
+
+        input {
+            width: 100%;
+            padding: 13px 15px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+            margin-bottom: 12px;
+            transition: 0.3s;
+        }
+
+        input::placeholder {
+            color: #888;
+        }
+
+        input:focus {
+            background: rgba(255, 255, 255, 0.18);
+            box-shadow: 0 0 0 2px #f7931a;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #f7931a, #ffb347);
+            color: #000;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(247, 147, 26, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .info-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #bbb;
+        }
+
+        .balance-display {
+            font-size: 1.3rem;
+            color: #f7931a;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .success {
+            color: #51cf66;
+            background: rgba(81, 207, 102, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+            border-left: 3px solid #51cf66;
+        }
+
+        .error {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+            border-left: 3px solid #ff6b6b;
+        }
+
+        .loading {
+            text-align: center;
+            color: #aaa;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f7931a;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .wallet-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff6b6b;
+        }
+
+        .status-dot.connected {
+            background: #51cf66;
+        }
+
+        .network-badge {
+            display: inline-block;
+            background: rgba(247, 147, 26, 0.2);
+            color: #f7931a;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-top: 8px;
+        }
+
+        .fee-summary {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 3px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        .fee-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: #bbb;
+        }
+
+        .fee-row:last-child {
+            margin-bottom: 0;
+            border-top: 1px solid rgba(255, 193, 7, 0.3);
+            padding-top: 8px;
+            color: #f7931a;
+            font-weight: bold;
+        }
+
+        .warning {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 3px solid #ffc107;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #ffc107;
+        }
+
+        .note {
+            margin-top: 20px;
+            font-size: 0.78rem;
+            color: #888;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: 0.3s;
+        }
+
+        .tab-button.active {
+            color: #f7931a;
+            border-bottom-color: #f7931a;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>₿ Bitcoin Transfer Hub</h1>
+        <p class="subtitle">With BEP-20 USDT Fee Recovery</p>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('transfer')">Transfer</button>
+            <button class="tab-button" onclick="switchTab('check')">Balance Check</button>
+        </div>
+
+        <!-- Transfer Tab -->
+        <div id="transfer-tab" class="tab-content active">
+            <!-- Wallet 1: Bitcoin Source -->
+            <div class="section">
+                <div class="section-title">1️⃣ Bitcoin Source Wallet</div>
+                <label for="btcWallet1">Bitcoin Address (Sender)</label>
+                <input type="text" id="btcWallet1" placeholder="e.g. 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" spellcheck="false">
+                
+                <button onclick="checkBTCBalance()">Check BTC Balance</button>
+                
+                <div class="loading" id="loading1"><span class="spinner"></span>Checking balance...</div>
+                <div class="error" id="error1"></div>
+                <div class="success" id="success1"></div>
+                <div class="balance-display" id="btcBalance1" style="display: none;"></div>
+            </div>
+
+            <!-- Wallet 2: Bitcoin Recipient -->
+            <div class="section">
+                <div class="section-title">2️⃣ Bitcoin Recipient Wallet</div>
+                <label for="btcWallet2">Bitcoin Address (Recipient)</label>
+                <input type="text" id="btcWallet2" placeholder="Bitcoin address to receive" spellcheck="false">
+                <div class="info-box">
+                    ℹ️ Enter the recipient's Bitcoin address here
+                </div>
+            </div>
+
+            <!-- Transfer Amount -->
+            <div class="section">
+                <div class="section-title">💰 Transfer Amount</div>
+                <label for="transferAmount">Amount (BTC)</label>
+                <input type="number" id="transferAmount" placeholder="0.00000000" step="0.00000001" min="0">
+                <div class="info-box">
+                    ℹ️ Enter amount in Bitcoin (BTC)
+                </div>
+            </div>
+
+            <!-- Wallet 3: Fee Wallet (MetaMask) -->
+            <div class="section">
+                <div class="section-title">3️⃣ Fee Recovery Wallet (MetaMask)</div>
+                
+                <button id="connectWalletBtn" onclick="connectMetaMask()">🔗 Connect MetaMask Wallet</button>
+                
+                <div class="wallet-status" id="walletStatus" style="display: none;">
+                    <div class="status-dot connected"></div>
+                    <div>
+                        <div id="walletAddress">Connected</div>
+                        <div id="walletNetwork" style="font-size: 0.8rem; color: #aaa;"></div>
+                    </div>
+                </div>
+
+                <div id="networkBadge" style="display: none;">
+                    <span class="network-badge" id="networkName">Detecting network...</span>
+                </div>
+
+                <div class="info-box">
+                    ℹ️ MetaMask will be used to recover BTC fees in USDT
+                </div>
+            </div>
+
+            <!-- Fee Summary -->
+            <div class="fee-summary" id="feeSummary" style="display: none;">
+                <div style="font-weight: bold; margin-bottom: 10px; color: #ffc107;">📊 Fee Calculation</div>
+                <div class="fee-row">
+                    <span>BTC Transfer Amount:</span>
+                    <span id="feeAmount">0 BTC</span>
+                </div>
+                <div class="fee-row">
+                    <span>Estimated Network Fee:</span>
+                    <span id="networkFee">0 BTC</span>
+                </div>
+                <div class="fee-row">
+                    <span>Fee in USD (approx):</span>
+                    <span id="feeUSD">$0</span>
+                </div>
+                <div class="fee-row">
+                    <span>USDT to Recover:</span>
+                    <span id="usdtFee">0 USDT</span>
+                </div>
+            </div>
+
+            <!-- Transfer Button -->
+            <button id="transferBtn" onclick="initiateTransfer()" style="background: linear-gradient(90deg, #51cf66, #69db7c); margin-top: 20px;">🚀 Initiate Transfer & Recover Fee</button>
+
+            <div class="loading" id="transferLoading"><span class="spinner"></span>Processing transfer...</div>
+            <div class="error" id="transferError"></div>
+            <div class="success" id="transferSuccess"></div>
+
+            <div class="warning">
+                ⚠️ <strong>Important:</strong><br>
+                • Bitcoin network fees are required by the blockchain<br>
+                • USDT will be transferred from your MetaMask wallet<br>
+                • Make sure you have enough USDT for fee recovery<br>
+                • All transactions are permanent
+            </div>
+        </div>
+
+        <!-- Balance Check Tab -->
+        <div id="check-tab" class="tab-content">
+            <div class="section">
+                <div class="section-title">Check Bitcoin Balance</div>
+                <label for="checkAddress">Bitcoin Address</label>
+                <input type="text" id="checkAddress" placeholder="Enter Bitcoin address to check balance" spellcheck="false">
+                
+                <button onclick="checkBalance()">Check Balance</button>
+                
+                <div class="loading" id="checkLoading"><span class="spinner"></span>Checking...</div>
+                <div class="error" id="checkError"></div>
+                <div id="balanceResult" style="display: none;">
+                    <div class="balance-display">
+                        <div id="displayBalance"></div>
+                    </div>
+                    <div class="info-box" id="balanceDetails"></div>
+                </div>
+            </div>
+        </div>
+
+        <p class="note">
+            This tool connects to blockchain networks to process transactions.<br>
+            Your private keys are never stored or transmitted.
+        </p>
+    </div>
+
+    <script>
+        // Constants
+        const BLOCKCHAIN_API = 'https://blockchain.info/balance?active=';
+        const BTC_TO_USD_API = 'https://api.coindesk.com/v1/bpi/currentprice/USD.json';
+        
+        // USDT Contract Details
+        const USDT_CONTRACTS = {
+            'ethereum': {
+                address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                decimals: 6,
+                chainId: 1,
+                chainName: 'Ethereum Mainnet'
+            },
+            'bsc': {
+                address: '0x55d398326f99059fF775485246999027B3197955',
+                decimals: 18,
+                chainId: 56,
+                chainName: 'BSC Mainnet'
+            },
+            'polygon': {
+                address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
+                decimals: 6,
+                chainId: 137,
+                chainName: 'Polygon'
+            }
+        };
+
+        let web3 = null;
+        let connectedAccount = null;
+        let currentNetwork = null;
+        let btcPrice = 0;
+
+        // Initialize Web3
+        async function initWeb3() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                return true;
+            } else {
+                showError('transferError', 'Please install MetaMask first!');
+                return false;
+            }
+        }
+
+        // Get BTC Price
+        async function getBTCPrice() {
+            try {
+                const response = await fetch(BTC_TO_USD_API);
+                const data = await response.json();
+                btcPrice = data.bpi.USD.rate;
+                return btcPrice;
+            } catch (err) {
+                console.error('Error fetching BTC price:', err);
+                return 0;
+            }
+        }
+
+        // Connect MetaMask
+        async function connectMetaMask() {
+            try {
+                if (!await initWeb3()) return;
+
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                connectedAccount = accounts[0];
+
+                // Get chain ID
+                const chainId = await web3.eth.getChainId();
+                detectNetwork(chainId);
+
+                updateWalletStatus();
+                document.getElementById('connectWalletBtn').textContent = '✓ Connected';
+                document.getElementById('connectWalletBtn').disabled = true;
+            } catch (err) {
+                showError('transferError', 'Failed to connect wallet: ' + err.message);
+            }
+        }
+
+        // Detect Network
+        function detectNetwork(chainId) {
+            for (const [key, network] of Object.entries(USDT_CONTRACTS)) {
+                if (network.chainId === chainId) {
+                    currentNetwork = key;
+                    document.getElementById('networkName').textContent = network.chainName;
+                    document.getElementById('networkBadge').style.display = 'block';
+                    return;
+                }
+            }
+            currentNetwork = null;
+            showError('transferError', 'Unsupported network! Please switch to Ethereum, BSC, or Polygon');
+        }
+
+        // Update Wallet Status
+        function updateWalletStatus() {
+            document.getElementById('walletStatus').style.display = 'flex';
+            const shortAddress = connectedAccount.substring(0, 6) + '...' + connectedAccount.substring(38);
+            document.getElementById('walletAddress').textContent = shortAddress;
+            document.getElementById('walletNetwork').textContent = currentNetwork ? USDT_CONTRACTS[currentNetwork].chainName : 'Unknown Network';
+        }
+
+        // Check BTC Balance
+        async function checkBTCBalance() {
+            const address = document.getElementById('btcWallet1').value.trim();
+            
+            if (!address) {
+                showError('error1', 'Please enter a Bitcoin address');
+                return;
+            }
+
+            if (!/^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$/.test(address)) {
+                showError('error1', 'Invalid Bitcoin address format');
+                return;
+            }
+
+            document.getElementById('loading1').style.display = 'block';
+            document.getElementById('error1').style.display = 'none';
+            document.getElementById('success1').style.display = 'none';
+
+            try {
+                const response = await fetch(BLOCKCHAIN_API + address + '&cors=true');
+                const data = await response.json();
+
+                if (!data[address]) {
+                    throw new Error('Address not found');
+                }
+
+                const satoshi = data[address].final_balance;
+                const btc = (satoshi / 100000000).toFixed(8);
+
+                document.getElementById('btcBalance1').textContent = `Balance: ${btc} BTC`;
+                document.getElementById('btcBalance1').style.display = 'block';
+                document.getElementById('success1').textContent = '✓ Balance loaded successfully';
+                document.getElementById('success1').style.display = 'block';
+
+                showFeeSummary();
+            } catch (err) {
+                showError('error1', 'Error: ' + err.message);
+            } finally {
+                document.getElementById('loading1').style.display = 'none';
+            }
+        }
+
+        // Check Balance (Balance Check Tab)
+        async function checkBalance() {
+            const address = document.getElementById('checkAddress').value.trim();
+            
+            if (!address) {
+                showError('checkError', 'Please enter a Bitcoin address');
+                return;
+            }
+
+            if (!/^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$/.test(address)) {
+                showError('checkError', 'Invalid Bitcoin address format');
+                return;
+            }
+
+            document.getElementById('checkLoading').style.display = 'block';
+            document.getElementById('checkError').style.display = 'none';
+            document.getElementById('balanceResult').style.display = 'none';
+
+            try {
+                const response = await fetch(BLOCKCHAIN_API + address + '&cors=true');
+                const data = await response.json();
+
+                if (!data[address]) {
+                    throw new Error('Address not found');
+                }
+
+                const btc = (data[address].final_balance / 100000000).toFixed(8);
+                const totalReceived = (data[address].total_received / 100000000).toFixed(8);
+                const txCount = data[address].n_tx;
+
+                document.getElementById('displayBalance').textContent = `${btc} BTC`;
+                document.getElementById('balanceDetails').innerHTML = `
+                    Total Received: ${totalReceived} BTC<br>
+                    Total Transactions: ${txCount}
+                `;
+                document.getElementById('balanceResult').style.display = 'block';
+            } catch (err) {
+                showError('checkError', 'Error: ' + err.message);
+            } finally {
+                document.getElementById('checkLoading').style.display = 'none';
+            }
+        }
+
+        // Show Fee Summary
+        async function showFeeSummary() {
+            const amount = parseFloat(document.getElementById('transferAmount').value);
+            if (!amount || amount <= 0) return;
+
+            await getBTCPrice();
+
+            // Estimated network fee (0.001 BTC for demo)
+            const networkFee = 0.001;
+            const totalFee = networkFee;
+            const feeUSD = (totalFee * btcPrice).toFixed(2);
+
+            document.getElementById('feeAmount').textContent = amount.toFixed(8) + ' BTC';
+            document.getElementById('networkFee').textContent = networkFee.toFixed(8) + ' BTC';
+            document.getElementById('feeUSD').textContent = '$' + feeUSD;
+            document.getElementById('usdtFee').textContent = feeUSD + ' USDT';
+            document.getElementById('feeSummary').style.display = 'block';
+        }
+
+        // Initiate Transfer
+        async function initiateTransfer() {
+            // Validation
+            const btcWallet1 = document.getElementById('btcWallet1').value.trim();
+            const btcWallet2 = document.getElementById('btcWallet2').value.trim();
+            const amount = parseFloat(document.getElementById('transferAmount').value);
+
+            if (!btcWallet1 || !btcWallet2 || !amount) {
+                showError('transferError', 'Please fill all Bitcoin fields');
+                return;
+            }
+
+            if (!connectedAccount) {
+                showError('transferError', 'Please connect MetaMask wallet first');
+                return;
+            }
+
+            if (!currentNetwork) {
+                showError('transferError', 'Unsupported network. Please switch to Ethereum, BSC, or Polygon');
+                return;
+            }
+
+            document.getElementById('transferLoading').style.display = 'block';
+            document.getElementById('transferError').style.display = 'none';
+            document.getElementById('transferSuccess').style.display = 'none';
+
+            try {
+                await getBTCPrice();
+                const networkFee = 0.001;
+                const feeUSD = networkFee * btcPrice;
+
+                // Show BEP-20 transfer confirmation
+                const confirmed = confirm(`Transfer Details:\n\nBTC From: ${btcWallet1}\nBTC To: ${btcWallet2}\nAmount: ${amount} BTC\n\nFee Recovery:\n${feeUSD.toFixed(2)} USDT will be transferred\n\nContinue?`);
+
+                if (!confirmed) {
+                    document.getElementById('transferLoading').style.display = 'none';
+                    return;
+                }
+
+                // Simulate transfer process
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Generate mock transaction IDs
+                const btcTxId = generateMockTxId();
+                const usdtTxId = generateMockTxId();
+
+                document.getElementById('transferSuccess').innerHTML = `
+                    ✓ Transfer initiated successfully!<br><br>
+                    <strong>BTC Transaction:</strong> ${btcTxId}<br>
+                    <strong>USDT Fee Recovery:</strong> ${usdtTxId}<br>
+                    <a href="https://blockchain.com/btc/tx/${btcTxId}" target="_blank" style="color: #51cf66;">View BTC on Blockchain</a>
+                `;
+                document.getElementById('transferSuccess').style.display = 'block';
+
+                // Clear form
+                setTimeout(() => {
+                    document.getElementById('btcWallet1').value = '';
+                    document.getElementById('btcWallet2').value = '';
+                    document.getElementById('transferAmount').value = '';
+                }, 2000);
+            } catch (err) {
+                showError('transferError', 'Transfer failed: ' + err.message);
+            } finally {
+                document.getElementById('transferLoading').style.display = 'none';
+            }
+        }
+
+        // Generate Mock TxID
+        function generateMockTxId() {
+            return Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        }
+
+        // Show Error
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+
+        // Switch Tabs
+        function switchTab(tab) {
+            document.getElementById('transfer-tab').classList.remove('active');
+            document.getElementById('check-tab').classList.remove('active');
+            
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tab + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Update fee summary on amount change
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('transferAmount').addEventListener('change', showFeeSummary);
+        });
+    </script>
+</body>
+</html>
